@@ -304,4 +304,254 @@ requestAnimationFrame(track);
 }
 </script>
 </body>
-</html>
+</</body>
+</
+<script>
+let autoMode = true;
+let autoTeam = 'home';
+let threeLine = [];
+let calibratingThree = false;
+let attempts = 0;
+let misses = 0;
+let shotActive = false;
+let shotStart = 0;
+let shotTeam = null;
+let shotPoints = 2;
+let lastAttempt = 0;
+
+const panel = document.createElement('div');
+
+panel.innerHTML = `
+<h3>AUTOMATIC TRACKING V3</h3>
+<button id="autoToggle">AUTO MODE: ON</button>
+<button id="threeSetup">Calibrate 3-point line</button>
+<button id="switchTeam">Switch possession</button>
+<p>HOME: Red shirts | AWAY: Blue shirts</p>
+<p id="autoStatus">Waiting for camera</p>
+<p>Attempts: <span id="attempts">0</span>
+| Estimated misses: <span id="misses">0</span></p>
+`;
+
+document.querySelector('.controls').prepend(panel);
+
+$('autoToggle').onclick = () => {
+autoMode = !autoMode;
+$('autoToggle').textContent =
+'AUTO MODE: ' + (autoMode ? 'ON' : 'OFF');
+shotActive = false;
+};
+
+$('switchTeam').onclick = () => {
+autoTeam = $('team').value === 'home'
+? 'away' : 'home';
+$('team').value = autoTeam;
+shotActive = false;
+};
+
+$('threeSetup').onclick = () => {
+threeLine = [];
+calibratingThree = true;
+$('cameraPanel').style.display = 'block';
+$('autoStatus').textContent =
+'Tap two ends of a straight 3-point boundary.';
+};
+
+canvas.addEventListener('click', e => {
+if(!calibratingThree) return;
+
+e.stopImmediatePropagation();
+
+let r = canvas.getBoundingClientRect();
+
+threeLine.push({
+x:(e.clientX-r.left)*canvas.width/r.width,
+y:(e.clientY-r.top)*canvas.height/r.height
+});
+
+if(threeLine.length === 2){
+calibratingThree = false;
+$('autoStatus').textContent =
+'3-point boundary calibrated';
+}
+},true);
+
+function sideOfLine(x,y){
+let a = threeLine[0];
+let b = threeLine[1];
+return (b.x-a.x)*(y-a.y)
+-(b.y-a.y)*(x-a.x);
+}
+
+function estimatePoints(x,y){
+if(threeLine.length !== 2 ||
+marks.length !== 2) return 2;
+
+let rimSide = sideOfLine(
+marks[0][0],marks[0][1]);
+
+let playerSide = sideOfLine(x,y);
+
+return rimSide*playerSide < 0 ? 3 : 2;
+}
+
+function identifyTeam(data,x,y){
+let red=0,blue=0;
+let rx=0,ry=0,bx=0,by=0;
+
+for(let dy=-25;dy<90;dy+=3){
+for(let dx=-65;dx<=65;dx+=3){
+
+let px=Math.round(x+dx);
+let py=Math.round(y+dy);
+
+if(px<0||py<0||
+px>=canvas.width||
+py>=canvas.height) continue;
+
+let i=(py*canvas.width+px)*4;
+
+let r=data[i];
+let g=data[i+1];
+let b=data[i+2];
+
+if(r>90&&r>g*1.45&&r>b*1.35){
+red++;rx+=px;ry+=py;
+}
+
+if(b>90&&b>r*1.45&&b>g*1.35){
+blue++;bx+=px;by+=py;
+}
+}
+}
+
+if(red>12&&red>blue*1.7){
+return {team:'home',x:rx/red,y:ry/red};
+}
+
+if(blue>12&&blue>red*1.7){
+return {team:'away',x:bx/blue,y:by/blue};
+}
+
+return null;
+}
+
+let originalScore = score;
+
+score = function(team,n){
+
+if(autoMode&&shotActive&&n>0&&armed){
+team=shotTeam||team;
+
+if(Number($('points').value)!==1){
+n=shotPoints;
+}
+
+originalScore(team,n);
+
+autoTeam=team==='home'?'away':'home';
+
+$('team').value=autoTeam;
+shotActive=false;
+
+$('autoStatus').textContent =
+team.toUpperCase()+' SCORED '+n;
+
+}else{
+originalScore(team,n);
+}
+};
+
+let lastBall=null;
+let holder=null;
+let holderTime=0;
+
+function automaticTracking(t){
+
+if(cameraRunning&&autoMode&&
+marks.length===2){
+
+let data=ctx.getImageData(
+0,0,canvas.width,canvas.height).data;
+
+let sx=0,sy=0,count=0;
+
+for(let y=0;y<canvas.height;y+=3){
+for(let x=0;x<canvas.width;x+=3){
+
+let i=(y*canvas.width+x)*4;
+let r=data[i],g=data[i+1],b=data[i+2];
+
+let tol=Number($('sensitivity').value);
+
+if(g>65&&g-r>tol&&g-b>tol){
+sx+=x;sy+=y;count++;
+}
+
+}
+}
+
+if(count>4&&count<700){
+
+let x=sx/count;
+let y=sy/count;
+
+let player=identifyTeam(data,x,y);
+
+if(player&&!shotActive){
+holder=player;
+holderTime=t;
+autoTeam=player.team;
+$('team').value=autoTeam;
+}
+
+if(lastBall&&holder&&
+t-holderTime<700&&
+lastBall.y-y>8&&
+!shotActive&&
+t-lastAttempt>1000){
+
+shotActive=true;
+shotStart=t;
+lastAttempt=t;
+shotTeam=holder.team;
+shotPoints=estimatePoints(holder.x,holder.y);
+
+attempts++;
+$('attempts').textContent=attempts;
+
+$('team').value=shotTeam;
+
+$('autoStatus').textContent=
+shotTeam.toUpperCase()+
+' | Estimated '+shotPoints+'-point attempt';
+}
+
+lastBall={x,y};
+
+}else{
+lastBall=null;
+}
+
+if(shotActive&&t-shotStart>2500){
+shotActive=false;
+misses++;
+$('misses').textContent=misses;
+$('autoStatus').textContent=
+'Estimated missed shot';
+}
+}
+
+if(cameraRunning&&threeLine.length===2){
+ctx.strokeStyle='yellow';
+ctx.lineWidth=3;
+ctx.beginPath();
+ctx.moveTo(threeLine[0].x,threeLine[0].y);
+ctx.lineTo(threeLine[1].x,threeLine[1].y);
+ctx.stroke();
+}
+
+requestAnimationFrame(automaticTracking);
+}
+
+requestAnimationFrame(automaticTracking);
+</script>
