@@ -1,34 +1,71 @@
-
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Mini Hoop Arena V4</title>
+<title>Mini Hoop Arena V5</title>
+
 <style>
 *{box-sizing:border-box}
-body{background:#080b10;color:white;font-family:Arial;text-align:center;margin:0;padding:15px}
+body{
+background:#080b10;
+color:white;
+font-family:Arial;
+text-align:center;
+margin:0;
+padding:15px
+}
 h1{font-size:22px;letter-spacing:3px}
-.clock{font:bold clamp(60px,10vw,110px) monospace;color:#ffcf40}
-.score{font:bold clamp(65px,12vw,130px) monospace;color:#55ff68}
+.clock{
+font:bold clamp(60px,10vw,110px) monospace;
+color:#ffcf40
+}
+.score{
+font:bold clamp(65px,12vw,130px) monospace;
+color:#55ff68
+}
 .teams{display:flex;gap:12px}
-.team{flex:1;background:#161b24;border-radius:12px;padding:12px;min-width:0}
-button,input,select{font-size:16px;padding:10px;margin:4px;border-radius:7px;border:1px solid #555}
-button{background:#293543;color:white;cursor:pointer}
-input,select{background:#151b24;color:white;max-width:100%}
+.team{
+flex:1;
+background:#161b24;
+border-radius:12px;
+padding:12px;
+min-width:0
+}
+button,input,select{
+font-size:16px;
+padding:10px;
+margin:4px;
+border-radius:7px;
+border:1px solid #555;
+background:#293543;
+color:white;
+max-width:100%
+}
+button{cursor:pointer}
 .small{color:#aaa;font-size:14px}
 .red{color:#ff5555;font-size:30px}
 .yellow{color:#ffcf40;font-size:30px}
-canvas{width:100%;max-width:800px;touch-action:none}
-.controls{padding:12px}
 .green{color:#55ff68}
 .primary{background:#176b36}
+canvas{width:100%;max-width:800px;touch-action:none}
+.controls{padding:12px}
+video{
+position:absolute;
+width:1px;
+height:1px;
+opacity:0;
+pointer-events:none
+}
 </style>
+
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/dist/tf.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/pose-detection@2.1.3/dist/pose-detection.min.js"></script>
+
 </head>
 <body>
 
-<h1>MINI HOOP ARENA V4</h1>
+<h1>MINI HOOP ARENA V5</h1>
 
 <div class="small">GAME CLOCK</div>
 <div id="clock" class="clock">5:00</div>
@@ -37,39 +74,55 @@ canvas{width:100%;max-width:800px;touch-action:none}
 <button onclick="pauseClock()">PAUSE</button>
 <button onclick="setTime()">SET TIME</button>
 
-<p>PERIOD <span id="period">1</span>
-<button onclick="nextPeriod()">NEXT PERIOD</button></p>
+<p>
+PERIOD <span id="period">1</span>
+<button onclick="nextPeriod()">NEXT PERIOD</button>
+</p>
 
 <div class="teams">
+
 <div class="team">
-<input id="homeName" value="HOME" style="width:100%;text-align:center">
+<input id="homeName" value="BOYS"
+style="width:100%;text-align:center"
+oninput="updateNames()">
+
 <div id="home" class="score">0</div>
+
 <button onclick="add('home',1)">+1</button>
 <button onclick="add('home',2)">+2</button>
 <button onclick="add('home',3)">+3</button>
 <button onclick="add('home',-1)">-1</button>
+
 <p>FOULS<br><span id="hf" class="red">0</span></p>
 <button onclick="add('hf',1)">+</button>
 <button onclick="add('hf',-1)">-</button>
+
 <p>TIMEOUTS<br><span id="ht" class="yellow">5</span></p>
 <button onclick="useTimeout('ht')">USE</button>
 <button onclick="add('ht',1)">+</button>
 </div>
 
 <div class="team">
-<input id="awayName" value="AWAY" style="width:100%;text-align:center">
+<input id="awayName" value="GIRLS"
+style="width:100%;text-align:center"
+oninput="updateNames()">
+
 <div id="away" class="score">0</div>
+
 <button onclick="add('away',1)">+1</button>
 <button onclick="add('away',2)">+2</button>
 <button onclick="add('away',3)">+3</button>
 <button onclick="add('away',-1)">-1</button>
+
 <p>FOULS<br><span id="af" class="red">0</span></p>
 <button onclick="add('af',1)">+</button>
 <button onclick="add('af',-1)">-</button>
+
 <p>TIMEOUTS<br><span id="at" class="yellow">5</span></p>
 <button onclick="useTimeout('at')">USE</button>
 <button onclick="add('at',1)">+</button>
 </div>
+
 </div>
 
 <div class="controls">
@@ -77,8 +130,8 @@ canvas{width:100%;max-width:800px;touch-action:none}
 <h3>POSSESSION</h3>
 
 <select id="team">
-<option value="home">HOME BALL</option>
-<option value="away">AWAY BALL</option>
+<option value="home">BOYS BALL</option>
+<option value="away">GIRLS BALL</option>
 </select>
 
 <button onclick="switchTeam()">SWITCH</button>
@@ -92,52 +145,131 @@ canvas{width:100%;max-width:800px;touch-action:none}
 <p>
 <label>
 <input type="checkbox" id="autoTeam" checked>
-Auto possession
+Automatic possession
 </label>
+
 <label>
 <input type="checkbox" id="autoThree" checked>
-Auto three-pointers
+Automatic three-pointers
 </label>
+</p>
+
+<h3>TEAM COLOR SETTINGS</h3>
+
+<label>
+Home shirt color
+<select id="hc"></select>
+</label>
+
+<label>
+Away shirt color
+<select id="ac"></select>
+</label>
+
+<p id="colorStatus" class="small">
+Choose different colors for each team.
 </p>
 
 <h3>SMART CAMERA</h3>
 
-<button class="primary" onclick="startCamera()">START CAMERA</button>
+<button class="primary" onclick="startCamera()">
+START CAMERA
+</button>
+
 <button onclick="stopCamera()">STOP CAMERA</button>
-<button onclick="hideCamera()">SHOW / HIDE CAMERA</button>
-<button onclick="calibrate('hoop')">CALIBRATE HOOP</button>
-<button onclick="calibrate('line')">SET 3-POINT LINE</button>
+
+<button onclick="hideCamera()">
+SHOW / HIDE CAMERA
+</button>
+
+<button onclick="calibrate('hoop')">
+CALIBRATE HOOP
+</button>
+
+<button onclick="calibrate('line')">
+SET 3-POINT LINE
+</button>
 
 <p id="status" class="green">Camera not started</p>
 <p id="detection">Waiting for basketball</p>
 
-<p class="small">
-Home: Red shirts | Away: Purple shirts<br>
-Green basketball
-</p>
-
-<video id="video" playsinline muted style="position:absolute;width:1px;height:1px;opacity:0;pointer-events:none"></video>
+<video id="video" playsinline muted></video>
 
 <div id="cameraPanel">
-<canvas id="canvas" width="480" height="360"></canvas>
-<p id="instructions">Start camera and calibrate hoop.</p>
 
-<label>Green ball sensitivity
-<input type="range" id="sensitivity" min="5" max="65" value="22">
+<canvas id="canvas" width="480" height="360"></canvas>
+
+<p id="instructions">
+Start camera and calibrate hoop.
+</p>
+
+<label>
+Green ball sensitivity
+<input type="range" id="sensitivity"
+min="5" max="65" value="22"
+oninput="document.getElementById('sensValue').textContent=this.value">
+<span id="sensValue">22</span>
 </label>
+
 </div>
 
 <p>
 Attempts: <span id="attempts">0</span>
-| Detected baskets: <span id="makes">0</span>
+|
+Detected baskets: <span id="makes">0</span>
 </p>
 
 <button onclick="resetGame()">RESET GAME</button>
 
+<p class="small">
+Experimental camera tracking.
+Keep manual scoring controls available.
+</p>
+
 </div>
 
 <script>
+
 const $=id=>document.getElementById(id);
+
+const colors=[
+'Red','Blue','Purple','Yellow',
+'Orange','Pink','White','Black'
+];
+
+for(const id of ['hc','ac']){
+for(const color of colors){
+$(id).add(new Option(color,color));
+}
+}
+
+$('hc').value='Red';
+$('ac').value='Purple';
+
+function teamName(team){
+return $(team+'Name').value||team.toUpperCase();
+}
+
+function updateNames(){
+$('team').options[0].text=teamName('home')+' BALL';
+$('team').options[1].text=teamName('away')+' BALL';
+}
+
+function checkColors(){
+$('colorStatus').textContent=
+$('hc').value===$('ac').value
+?'Choose different colors!'
+:teamName('home')+' = '+$('hc').value+
+' | '+teamName('away')+' = '+$('ac').value;
+
+holder=null;
+shot=null;
+candidate='';
+candidateFrames=0;
+}
+
+$('hc').onchange=checkColors;
+$('ac').onchange=checkColors;
 
 let duration=300000;
 let remaining=duration;
@@ -146,11 +278,14 @@ let timer=null;
 let audio=null;
 
 function add(id,n){
-$(id).textContent=Math.max(0,Number($(id).textContent)+n);
+$(id).textContent=Math.max(
+0,Number($(id).textContent)+n
+);
 }
 
 function showClock(){
 let seconds=Math.ceil(remaining/1000);
+
 $('clock').textContent=
 Math.floor(seconds/60)+':'+
 String(seconds%60).padStart(2,'0');
@@ -158,31 +293,44 @@ String(seconds%60).padStart(2,'0');
 
 function enableAudio(){
 try{
-if(!audio)audio=new(window.AudioContext||window.webkitAudioContext)();
+if(!audio){
+audio=new(
+window.AudioContext||
+window.webkitAudioContext
+)();
+}
 audio.resume();
 }catch(e){}
 }
 
 function buzzer(){
 if(!audio)return;
+
 let oscillator=audio.createOscillator();
 let gain=audio.createGain();
+
 oscillator.type='sawtooth';
 oscillator.frequency.value=180;
-gain.gain.value=0.12;
+gain.gain.value=.12;
+
 oscillator.connect(gain);
 gain.connect(audio.destination);
+
 oscillator.start();
-oscillator.stop(audio.currentTime+0.9);
+oscillator.stop(audio.currentTime+.9);
 }
 
 function startClock(){
 enableAudio();
+
 if(timer||remaining<=0)return;
+
 deadline=Date.now()+remaining;
+
 timer=setInterval(()=>{
 remaining=Math.max(0,deadline-Date.now());
 showClock();
+
 if(remaining===0){
 clearInterval(timer);
 timer=null;
@@ -194,22 +342,31 @@ buzzer();
 function pauseClock(){
 if(timer){
 remaining=Math.max(0,deadline-Date.now());
+}
+
 clearInterval(timer);
 timer=null;
-}
 showClock();
 }
 
 function setTime(){
-let value=prompt('Enter any time in minutes and seconds. Example: 8:30','5:00');
+let value=prompt(
+'Enter minutes and seconds. Example: 8:30',
+$('clock').textContent
+);
+
 if(value===null)return;
+
 if(!/^\d+(:[0-5]?\d)?$/.test(value)){
 alert('Enter a time like 5:30');
 return;
 }
+
 let p=value.split(':').map(Number);
 let ms=(p[0]*60+(p[1]||0))*1000;
+
 if(!Number.isSafeInteger(ms))return;
+
 pauseClock();
 duration=ms;
 remaining=duration;
@@ -230,69 +387,97 @@ pauseClock();
 }
 }
 
-function switchTeam(){
-$('team').value=$('team').value==='home'?'away':'home';
+function clearTracking(){
 shot=null;
 holder=null;
-candidate=null;
+candidate='';
 candidateFrames=0;
-lockUntil=performance.now()+1800;
+armed=0;
+previous=null;
+}
+
+function switchTeam(){
+$('team').value=
+$('team').value==='home'?'away':'home';
+
+clearTracking();
+lockUntil=performance.now()+1500;
 }
 
 $('team').onchange=()=>{
-shot=null;
-holder=null;
-candidate=null;
-candidateFrames=0;
-lockUntil=performance.now()+1800;
+clearTracking();
+lockUntil=performance.now()+1500;
 };
 
 function resetGame(){
 if(!confirm('Reset game?'))return;
+
 pauseClock();
-['home','away','hf','af','attempts','makes'].forEach(id=>$(id).textContent=0);
+
+['home','away','hf','af','attempts','makes']
+.forEach(id=>$(id).textContent=0);
+
 $('ht').textContent=5;
 $('at').textContent=5;
 $('period').textContent=1;
 $('team').value='home';
+
 remaining=duration;
-shot=null;
-holder=null;
-candidate=null;
-candidateFrames=0;
-armed=0;
-previous=null;
+clearTracking();
 lockUntil=0;
+lastScore=-5000;
+lastAttempt=-5000;
+
 showClock();
 }
 
 const video=$('video');
 const canvas=$('canvas');
-const ctx=canvas.getContext('2d',{willReadFrequently:true});
+
+const ctx=canvas.getContext(
+'2d',{willReadFrequently:true}
+);
+
+const raw=document.createElement('canvas');
+
+const rawCtx=raw.getContext(
+'2d',{willReadFrequently:true}
+);
 
 let cameraRunning=false;
 let starting=false;
 let stream=null;
 let frameID=null;
+
+let model=null;
+let poses=[];
+let poseBusy=false;
+let poseTime=0;
+let poseUpdated=0;
+
 let hoop=[];
 let line=[];
 let calibration='';
+
 let previous=null;
 let armed=0;
-let lastScore=-3000;
-let lastAttempt=-3000;
+let lastScore=-5000;
+let lastAttempt=-5000;
+
 let holder=null;
-let holderTime=0;
-let candidate=null;
-let candidateFrames=0;
 let shot=null;
+let candidate='';
+let candidateFrames=0;
 let lockUntil=0;
 
 async function startCamera(){
+
 if(cameraRunning||starting)return;
+
 starting=true;
 
 try{
+
 stream=await navigator.mediaDevices.getUserMedia({
 video:{
 facingMode:{ideal:'environment'},
@@ -310,77 +495,124 @@ canvas.height=Math.round(
 480*video.videoHeight/video.videoWidth
 );
 
+raw.width=canvas.width;
+raw.height=canvas.height;
+
 cameraRunning=true;
-$('status').textContent='CAMERA ACTIVE';
+
 calibrate('hoop');
+
+$('status').textContent=
+'CAMERA ACTIVE - Loading AI foot tracking';
+
 frameID=requestAnimationFrame(track);
 
+if(!model){
+
+await tf.ready();
+
+model=await poseDetection.createDetector(
+poseDetection.SupportedModels.MoveNet,
+{
+modelType:
+poseDetection.movenet.modelType.MULTIPOSE_LIGHTNING,
+enableTracking:true
+}
+);
+
+}
+
+if(cameraRunning){
+$('status').textContent=
+'CAMERA AND AI FOOT TRACKING ACTIVE';
+}
+
 }catch(e){
-if(stream)stream.getTracks().forEach(t=>t.stop());
-video.srcObject=null;
-$('status').textContent='Camera error: '+e.message;
+
+$('status').textContent=
+'Camera or AI error: '+e.message;
+
 }finally{
 starting=false;
 }
+
 }
 
 function stopCamera(){
+
 cameraRunning=false;
+
 cancelAnimationFrame(frameID);
-if(stream)stream.getTracks().forEach(t=>t.stop());
+
+if(stream){
+stream.getTracks().forEach(t=>t.stop());
+}
+
 video.srcObject=null;
 stream=null;
-shot=null;
-armed=0;
-previous=null;
+poses=[];
+
+clearTracking();
+
 $('status').textContent='Camera stopped';
+
 }
 
 function hideCamera(){
-let p=$('cameraPanel');
 
-if(p.style.display==='none'){
-p.style.display='block';
-}else{
-if(calibration){
+let panel=$('cameraPanel');
+
+if(calibration&&!panel.hidden){
 alert('Finish calibration first');
 return;
 }
-p.style.display='none';
-}
 
-$('status').textContent=cameraRunning?
-'CAMERA ACTIVE - TRACKING':
-'Camera not started';
+panel.hidden=!panel.hidden;
+
+$('status').textContent=cameraRunning
+?'CAMERA ACTIVE - TRACKING'
+:'Camera not started';
+
 }
 
 function calibrate(type){
+
 if(!cameraRunning){
 alert('Start the camera first');
 return;
 }
 
-calibration=type;
-$('cameraPanel').style.display='block';
-armed=0;
-shot=null;
-
-if(type==='hoop'){
-hoop=[];
-line=[];
-$('instructions').textContent='Tap the center of the rim';
-}else{
-if(hoop.length!==2){
-calibration='';
+if(type==='line'&&hoop.length!==2){
 alert('Calibrate the hoop first');
 return;
 }
+
+calibration=type;
+$('cameraPanel').hidden=false;
+
+clearTracking();
+
+if(type==='hoop'){
+
+hoop=[];
 line=[];
-$('instructions').textContent='Tap one end of the 3-point line';
+
+$('instructions').textContent=
+'Tap center of rim';
+
+}else{
+
+line=[];
+
+$('instructions').textContent=
+'Tap first end of blue three-point line';
+
 }
+
 }
 
 canvas.addEventListener('click',e=>{
+
 if(!calibration)return;
 
 let r=canvas.getBoundingClientRect();
@@ -391,153 +623,324 @@ y:(e.clientY-r.top)*canvas.height/r.height
 };
 
 if(calibration==='hoop'){
+
 hoop.push(p);
 
 if(hoop.length===1){
-$('instructions').textContent='Tap the bottom of the net';
+
+$('instructions').textContent=
+'Tap center of bottom of net';
+
 }else{
+
 if(hoop[1].y<=hoop[0].y+5){
+
 hoop=[];
-$('instructions').textContent='Try again. Tap rim, then net below it.';
+
+$('instructions').textContent=
+'Try again. Tap rim then net below it.';
+
 return;
+
 }
+
 calibration='';
-$('instructions').textContent='Hoop calibrated!';
+
+$('instructions').textContent=
+'Hoop calibrated!';
+
 }
+
 }else if(calibration==='line'){
+
 line.push(p);
 
 if(line.length===1){
-$('instructions').textContent='Tap the other end of the 3-point line';
+
+$('instructions').textContent=
+'Tap other end of blue three-point line';
+
 }else{
-if(Math.hypot(line[0].x-line[1].x,line[0].y-line[1].y)<10){
+
+if(Math.hypot(
+line[0].x-line[1].x,
+line[0].y-line[1].y
+)<10){
+
 line=[];
-$('instructions').textContent='Try again. Tap two different ends.';
+
+$('instructions').textContent=
+'Tap two different ends of the line';
+
 return;
+
 }
+
 calibration='';
-$('instructions').textContent='3-point line calibrated!';
+
+$('instructions').textContent=
+'Three-point line calibrated!';
+
 }
+
 }
+
 });
 
-function side(x,y){
-let a=line[0],b=line[1];
+function classifyColor(r,g,b){
 
-return (b.x-a.x)*(y-a.y)-
-(b.y-a.y)*(x-a.x);
+let max=Math.max(r,g,b);
+let min=Math.min(r,g,b);
+let d=max-min;
+
+if(max<65)return 'Black';
+if(d<35&&min>145)return 'White';
+if(d<35)return '';
+
+let h;
+
+if(max===r){
+h=60*((g-b)/d+6)%360;
+}else if(max===g){
+h=60*((b-r)/d+2);
+}else{
+h=60*((r-g)/d+4);
 }
 
-function estimatePoints(player){
-let manual=Number($('points').value);
-if(manual===1)return 1;
+if(h<15||h>=345)return 'Red';
+if(h<42)return 'Orange';
+if(h<75)return 'Yellow';
+if(h<165)return '';
+if(h<255)return 'Blue';
+if(h<300)return 'Purple';
 
-if(!$('autoThree').checked||
-line.length!==2||
-hoop.length!==2||
-!player)return manual;
+return 'Pink';
 
-let hoopSide=side(hoop[1].x,hoop[1].y);
-let playerSide=side(player.x,player.y);
-
-return hoopSide*playerSide<0?3:2;
 }
 
-function findPlayer(data,x,y){
-let red=0,purple=0;
-let rx=0,ry=0,pxs=0,pys=0;
+function findPlayers(data,t){
 
-for(let dy=-20;dy<85;dy+=3){
-for(let dx=-55;dx<=55;dx+=3){
+let players=[];
+
+if(t-poseUpdated>500)return players;
+
+for(const pose of poses){
+
+let k=pose.keypoints;
+
+const good=i=>
+k[i]&&k[i].score>.3;
+
+if(![5,6,11,12].every(good))continue;
+
+let x=(
+k[5].x+k[6].x+
+k[11].x+k[12].x
+)/4;
+
+let y=(
+k[5].y+k[6].y+
+k[11].y+k[12].y
+)/4;
+
+let counts={};
+
+for(let dy=-10;dy<=10;dy+=3){
+for(let dx=-10;dx<=10;dx+=3){
 
 let px=Math.round(x+dx);
 let py=Math.round(y+dy);
 
-if(px<0||py<0||
+if(
+px<0||py<0||
 px>=canvas.width||
-py>=canvas.height)continue;
+py>=canvas.height
+)continue;
 
 let i=(py*canvas.width+px)*4;
 
-let r=data[i];
-let g=data[i+1];
-let b=data[i+2];
+let color=classifyColor(
+data[i],data[i+1],data[i+2]
+);
 
-if(r>100&&r>g*1.6&&r>b*1.5){
-red++;
-rx+=px;
-ry+=py;
-}
+counts[color]=(counts[color]||0)+1;
 
-if(r>75&&b>85&&
-r>g*1.4&&b>g*1.5&&
-b>r*.85&&b<r*2.3){
-purple++;
-pxs+=px;
-pys+=py;
-}
 }
 }
 
-if(red>18&&red>purple*1.8){
-return {
-team:'home',
-x:rx/red,
-y:ry/red
-};
+let home=counts[$('hc').value]||0;
+let away=counts[$('ac').value]||0;
+
+if($('hc').value===$('ac').value)continue;
+
+if(Math.max(home,away)<8)continue;
+
+if(
+Math.max(home,away)<
+Math.min(home,away)*1.5
+)continue;
+
+players.push({
+
+team:home>away?'home':'away',
+
+x:x,
+y:y,
+
+feet:[15,16]
+.filter(good)
+.map(i=>k[i]),
+
+hands:[9,10]
+.filter(good)
+.map(i=>k[i])
+
+});
+
 }
 
-if(purple>18&&purple>red*1.8){
-return {
-team:'away',
-x:pxs/purple,
-y:pys/purple
-};
+return players;
+
 }
 
-return null;
+function lineSide(p){
+
+let a=line[0];
+let b=line[1];
+
+return (b.x-a.x)*(p.y-a.y)-
+(b.y-a.y)*(p.x-a.x);
+
+}
+
+function estimatePoints(player){
+
+let manual=Number($('points').value);
+
+if(manual===1)return 1;
+
+if(
+!$('autoThree').checked||
+line.length!==2||
+hoop.length!==2||
+!player||
+player.feet.length!==2
+)return manual;
+
+let reference=lineSide(hoop[1]);
+
+let length=Math.hypot(
+line[1].x-line[0].x,
+line[1].y-line[0].y
+);
+
+if(Math.abs(reference)<length*3){
+return manual;
+}
+
+let behind=player.feet.every(foot=>{
+
+let side=lineSide(foot);
+let distance=Math.abs(side)/length;
+
+return side*reference<0&&distance>5;
+
+});
+
+return behind?3:2;
+
 }
 
 function madeBasket(t){
+
 let team=$('team').value;
 let points=Number($('points').value);
 
 if(shot){
-if($('autoTeam').checked)team=shot.team;
-if($('autoThree').checked&&points!==1)
+
+if($('autoTeam').checked){
+team=shot.team;
+}
+
+if($('autoThree').checked&&points!==1){
 points=shot.points;
+}
+
 }
 
 add(team,points);
 add('makes',1);
 
 $('detection').textContent=
-team.toUpperCase()+' SCORES +'+points;
+teamName(team)+' SCORES +'+points;
 
 if($('autoTeam').checked&&points!==1){
-$('team').value=team==='home'?'away':'home';
+
+$('team').value=
+team==='home'?'away':'home';
+
 }
 
 lastScore=t;
-armed=0;
+
 shot=null;
 holder=null;
-candidate=null;
+candidate='';
 candidateFrames=0;
-lockUntil=t+1800;
+armed=0;
+
+lockUntil=t+600;
+
 }
 
 function track(t){
+
 if(!cameraRunning)return;
 
-try{
-ctx.drawImage(video,0,0,canvas.width,canvas.height);
+frameID=requestAnimationFrame(track);
 
-let data=ctx.getImageData(
+if(video.readyState<2)return;
+
+try{
+
+rawCtx.drawImage(
+video,0,0,canvas.width,canvas.height
+);
+
+ctx.drawImage(raw,0,0);
+
+if(model&&!poseBusy&&t-poseTime>100){
+
+poseBusy=true;
+poseTime=t;
+
+model.estimatePoses(raw)
+.then(result=>{
+
+poses=result;
+poseUpdated=performance.now();
+
+})
+.catch(e=>{
+
+$('status').textContent=
+'AI tracking error: '+e.message;
+
+})
+.finally(()=>{
+poseBusy=false;
+});
+
+}
+
+let data=rawCtx.getImageData(
 0,0,canvas.width,canvas.height
 ).data;
 
-let sx=0,sy=0,n=0;
+let sx=0;
+let sy=0;
+let n=0;
+
 let tol=Number($('sensitivity').value);
 
 for(let y=0;y<canvas.height;y+=2){
@@ -550,130 +953,277 @@ let g=data[i+1];
 let b=data[i+2];
 
 if(g>65&&g-r>tol&&g-b>tol){
+
 sx+=x;
 sy+=y;
 n++;
+
+}
+
 }
 }
+
+let players=findPlayers(data,t);
+
+for(const player of players){
+
+ctx.fillStyle='cyan';
+
+for(const foot of player.feet){
+
+ctx.fillRect(
+foot.x-4,foot.y-4,8,8
+);
+
+}
+
+ctx.font='12px Arial';
+ctx.fillStyle='white';
+
+ctx.fillText(
+teamName(player.team),
+player.x-20,
+player.y-15
+);
+
 }
 
 if(n>4&&n<1800){
-let x=sx/n;
-let y=sy/n;
-let player=findPlayer(data,x,y);
 
-if(!calibration&&t>lockUntil&&!shot){
-
-if(player){
-if(candidate===player.team){
-candidateFrames++;
-}else{
-candidate=player.team;
-candidateFrames=1;
-}
-
-if(candidateFrames>=3){
-holder=player;
-holderTime=t;
-
-if($('autoTeam').checked){
-$('team').value=player.team;
-}
-
-$('detection').textContent=
-$('team').value.toUpperCase()+' POSSESSION';
-}
-}else{
-candidate=null;
-candidateFrames=0;
-}
-
-if(previous&&holder&&
-t-holderTime<700&&
-previous.y-y>7&&
-t-lastAttempt>1000){
-
-shot={
-team:$('team').value,
-points:estimatePoints(holder),
-time:t
+let ball={
+x:sx/n,
+y:sy/n,
+t:t
 };
-
-lastAttempt=t;
-add('attempts',1);
-
-$('detection').textContent=
-shot.team.toUpperCase()+
-' SHOOTS '+shot.points;
-}
-}
-
-if(!calibration&&hoop.length===2){
-let u=hoop[0],l=hoop[1];
-let w=Math.max(12,Math.abs(l.y-u.y)*.85);
-
-if(previous&&
-previous.y<u.y&&
-y>=u.y&&
-Math.abs(x-u.x)<w){
-armed=t;
-}
-
-if(armed&&
-t-armed<1000&&
-y>=l.y-4&&
-Math.abs(x-l.x)<w&&
-previous&&y>previous.y&&
-t-lastScore>1000){
-madeBasket(t);
-}
-}
-
-previous={x,y};
 
 ctx.strokeStyle='lime';
 ctx.lineWidth=2;
+
 ctx.beginPath();
-ctx.arc(x,y,12,0,Math.PI*2);
+ctx.arc(ball.x,ball.y,12,0,Math.PI*2);
 ctx.stroke();
 
+let nearest=null;
+let distance=28;
+
+for(const player of players){
+
+for(const hand of player.hands){
+
+let d=Math.hypot(
+hand.x-ball.x,
+hand.y-ball.y
+);
+
+if(d<distance){
+
+nearest=player;
+distance=d;
+
+}
+
+}
+
+}
+
+if(!calibration&&t>lockUntil){
+
+if(nearest){
+
+if(candidate===nearest.team){
+
+candidateFrames++;
+
 }else{
+
+candidate=nearest.team;
+candidateFrames=1;
+
+}
+
+if(candidateFrames>=4){
+
+if(!shot||t-shot.time>500){
+
+shot=null;
+
+holder={
+player:nearest,
+time:t
+};
+
+if($('autoTeam').checked){
+
+$('team').value=nearest.team;
+
+}
+
+$('detection').textContent=
+teamName($('team').value)+' POSSESSION';
+
+}
+
+}
+
+}else{
+
+candidateFrames=0;
+candidate='';
+
+if(
+!shot&&holder&&
+t-holder.time<600&&
+previous&&
+t-lastAttempt>700&&
+previous.y-ball.y>3
+){
+
+shot={
+
+team:$('autoTeam').checked
+?holder.player.team
+:$('team').value,
+
+points:estimatePoints(holder.player),
+
+time:t
+
+};
+
+lastAttempt=t;
+
+add('attempts',1);
+
+$('detection').textContent=
+teamName(shot.team)+
+' SHOOTS '+shot.points+' POINTS';
+
+}
+
+}
+
+}
+
+if(
+!calibration&&
+hoop.length===2&&
+previous&&
+t-previous.t<350
+){
+
+let upper=hoop[0];
+let lower=hoop[1];
+
+let width=Math.max(
+12,(lower.y-upper.y)*.85
+);
+
+function crosses(y,x){
+
+if(
+previous.y>=y||
+ball.y<y||
+ball.y<=previous.y
+)return false;
+
+let f=(y-previous.y)/
+(ball.y-previous.y);
+
+let crossingX=previous.x+
+(ball.x-previous.x)*f;
+
+return Math.abs(crossingX-x)<width;
+
+}
+
+if(crosses(upper.y,upper.x)){
+
+armed=t;
+
+}
+
+if(
+armed&&
+t-armed<1200&&
+crosses(lower.y-3,lower.x)&&
+t-lastScore>1000
+){
+
+madeBasket(t);
+
+}
+
+}
+
+previous=ball;
+
+}else{
+
+candidateFrames=0;
+
+if(previous&&t-previous.t>350){
 previous=null;
 }
 
-if(armed&&t-armed>1000)armed=0;
-
-if(shot&&t-shot.time>2500){
-shot=null;
-holder=null;
-$('detection').textContent='Tracking basketball';
 }
 
-for(let p of hoop){
+if(armed&&t-armed>1200){
+armed=0;
+}
+
+if(shot&&t-shot.time>3000){
+
+shot=null;
+holder=null;
+
+$('detection').textContent=
+'Tracking rebound and possession';
+
+}
+
+for(const p of hoop){
+
 ctx.strokeStyle='red';
 ctx.lineWidth=3;
-ctx.strokeRect(p.x-12,p.y-5,24,10);
+
+ctx.strokeRect(
+p.x-12,p.y-5,24,10
+);
+
 }
 
 if(line.length===2){
+
 ctx.strokeStyle='yellow';
 ctx.lineWidth=3;
+
 ctx.beginPath();
-ctx.moveTo(line[0].x,line[0].y);
-ctx.lineTo(line[1].x,line[1].y);
+
+ctx.moveTo(
+line[0].x,line[0].y
+);
+
+ctx.lineTo(
+line[1].x,line[1].y
+);
+
 ctx.stroke();
+
 }
 
 }catch(e){
-$('status').textContent='Tracking error: '+e.message;
+
+$('status').textContent=
+'Tracking error: '+e.message;
+
 }
 
-if(cameraRunning){
-frameID=requestAnimationFrame(track);
-}
 }
 
 showClock();
+updateNames();
+checkColors();
+
 </script>
 </body>
 </html>
