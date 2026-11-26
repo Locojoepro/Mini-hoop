@@ -1,0 +1,170 @@
+ <!DOCTYPE html>
+<html>
+<head>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mini Hoop Arena</title>
+<style>
+body {
+  background:#101722;
+  color:white;
+  font:18px system-ui;
+  text-align:center;
+}
+button,select {
+  font:inherit;
+  padding:12px;
+  margin:5px;
+  border-radius:8px;
+}
+canvas {
+  width:min(100%,800px);
+  touch-action:none;
+}
+strong {
+  font-size:65px;
+  color:#7bea70;
+}
+</style>
+</head>
+<body>
+<h1>MINI HOOP ARENA</h1>
+<div>
+HOME <strong id="h">0</strong>
+—
+<strong id="a">0</strong> AWAY
+</div>
+
+<select id="team">
+<option value="h">Home possession</option>
+<option value="a">Away possession</option>
+</select>
+
+<select id="pts">
+<option value="2">2 points</option>
+<option value="1">Free throw</option>
+<option value="3">3 points</option>
+</select>
+
+<br>
+<button id="start">Start camera</button>
+<button onclick="add(1)">+1</button>
+<button onclick="add(2)">+2</button>
+<button onclick="add(3)">+3</button>
+<button onclick="add(-1)">Undo point</button>
+<button onclick="reset()">Reset</button>
+
+<p id="status">Start camera to begin.</p>
+
+<video id="v" playsinline muted hidden></video>
+<canvas id="c" width="640" height="480"></canvas>
+
+<p>Tap the rim center, then the bottom of the net.</p>
+
+<label>Green sensitivity
+<input id="tol" type="range" min="5" max="65" value="22">
+</label>
+
+<button onclick="marks=[];phase=0">Recalibrate</button>
+
+<script>
+const $=id=>document.getElementById(id);
+const v=$('v'),c=$('c');
+const ctx=c.getContext('2d',{willReadFrequently:true});
+
+let marks=[],phase=0,armed=0,last=0,running=false;
+
+function add(n){
+  let el=$($('team').value);
+  el.textContent=Math.max(0,+el.textContent+n);
+}
+
+function reset(){
+  $('h').textContent='0';
+  $('a').textContent='0';
+  phase=0;
+}
+
+$('start').onclick=async()=>{
+  try{
+    v.srcObject=await navigator.mediaDevices.getUserMedia({
+      video:{facingMode:{ideal:'environment'}},
+      audio:false
+    });
+    await v.play();
+    c.height=Math.round(640*v.videoHeight/v.videoWidth);
+    if(!running){
+      running=true;
+      requestAnimationFrame(frame);
+    }
+    $('status').textContent='Tap rim center, then bottom of net.';
+  }catch(e){
+    $('status').textContent='Camera unavailable: '+e.message;
+  }
+};
+
+c.onclick=e=>{
+  let r=c.getBoundingClientRect();
+  if(marks.length===2)marks=[];
+  marks.push([
+    (e.clientX-r.left)*c.width/r.width,
+    (e.clientY-r.top)*c.height/r.height
+  ]);
+  phase=0;
+  $('status').textContent=marks.length===2
+    ?'Calibrated. Start shooting!'
+    :'Tap bottom of net.';
+};
+
+function frame(t){
+  ctx.drawImage(v,0,0,c.width,c.height);
+  let d=ctx.getImageData(0,0,c.width,c.height).data;
+  let xs=0,ys=0,n=0;
+  let threshold=+$('tol').value;
+
+  for(let y=0;y<c.height;y+=2){
+    for(let x=0;x<c.width;x+=2){
+      let i=(y*c.width+x)*4;
+      let r=d[i],g=d[i+1],b=d[i+2];
+      if(g>65&&g-r>threshold&&g-b>threshold){
+        xs+=x;ys+=y;n++;
+      }
+    }
+  }
+
+  if(n>5&&n<1500){
+    let x=xs/n,y=ys/n;
+    ctx.strokeStyle='lime';
+    ctx.lineWidth=2;
+    ctx.beginPath();
+    ctx.arc(x,y,10,0,Math.PI*2);
+    ctx.stroke();
+
+    if(marks.length===2){
+      let [u,l]=marks;
+      let w=Math.max(12,Math.abs(l[1]-u[1])*.85);
+
+      if(Math.abs(x-u[0])<w&&y<u[1]+4&&y>u[1]-w*2){
+        phase=1;
+        armed=t;
+      }
+
+      if(phase&&t-armed<700&&Math.abs(x-l[0])<w&&y>=l[1]-4&&t-last>1000){
+        add(+$('pts').value);
+        last=t;
+        phase=0;
+      }
+    }
+  }
+
+  if(t-armed>700)phase=0;
+
+  for(let m of marks){
+    ctx.strokeStyle='red';
+    ctx.strokeRect(m[0]-12,m[1]-5,24,10);
+  }
+
+  requestAnimationFrame(frame);
+}
+</script>
+</body>
+</html>
