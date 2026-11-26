@@ -633,7 +633,222 @@ $('instructions').textContent=
 
 }else{
 
-if(hoop[1].y<=hoop[0].y+5){
+if(hoop[1].y<=hoop[0].y+let data=rawCtx.getImageData(
+0,0,canvas.width,canvas.height
+).data;
+
+if(!window.ballTracker){
+window.ballTracker={
+x:0,y:0,vx:0,vy:0,
+last:0,radius:12,
+visible:false
+};
+}
+
+let tracker=window.ballTracker;
+let tol=Number($('sensitivity').value);
+let w=canvas.width;
+let h=canvas.height;
+
+let gw=Math.ceil(w/2);
+let gh=Math.ceil(h/2);
+
+let mask=new Uint8Array(gw*gh);
+let queue=new Int32Array(gw*gh);
+
+for(let y=0;y<gh;y++){
+for(let x=0;x<gw;x++){
+
+let i=(y*2*w+x*2)*4;
+
+let r=data[i];
+let g=data[i+1];
+let b=data[i+2];
+
+let green=g-(r+b)/2;
+
+if(
+g>45&&
+green>tol*.75&&
+g>r*1.08&&
+g>b*1.08
+){
+mask[y*gw+x]=1;
+}
+
+}
+}
+
+let best=null;
+let bestScore=-Infinity;
+
+let age=t-tracker.last;
+let predictedX=tracker.x+tracker.vx*age;
+let predictedY=tracker.y+tracker.vy*age;
+
+for(let j=0;j<mask.length;j++){
+
+if(mask[j]!==1)continue;
+
+let head=0;
+let tail=1;
+
+queue[0]=j;
+mask[j]=0;
+
+let sumX=0;
+let sumY=0;
+let count=0;
+
+let minX=gw;
+let maxX=0;
+let minY=gh;
+let maxY=0;
+
+while(head<tail){
+
+let p=queue[head++];
+let x=p%gw;
+let y=Math.floor(p/gw);
+
+sumX+=x*2;
+sumY+=y*2;
+count++;
+
+minX=Math.min(minX,x);
+maxX=Math.max(maxX,x);
+minY=Math.min(minY,y);
+maxY=Math.max(maxY,y);
+
+for(let dy=-1;dy<=1;dy++){
+for(let dx=-1;dx<=1;dx++){
+
+let nx=x+dx;
+let ny=y+dy;
+
+if(
+nx<0||ny<0||
+nx>=gw||ny>=gh
+)continue;
+
+let k=ny*gw+nx;
+
+if(mask[k]===1){
+mask[k]=0;
+queue[tail++]=k;
+}
+
+}
+}
+
+}
+
+if(count<3||count>3000)continue;
+
+let cx=sumX/count;
+let cy=sumY/count;
+
+let bw=maxX-minX+1;
+let bh=maxY-minY+1;
+
+let shape=Math.min(bw,bh)/
+Math.max(bw,bh);
+
+let score=
+Math.log(count+1)*12+
+shape*20;
+
+if(tracker.last&&age<250){
+
+let distance=Math.hypot(
+cx-predictedX,
+cy-predictedY
+);
+
+score-=distance*.15;
+
+}
+
+if(score>bestScore){
+
+bestScore=score;
+
+best={
+x:cx,
+y:cy,
+radius:Math.max(
+6,Math.min(40,Math.max(bw,bh))
+)
+};
+
+}
+
+}
+
+tracker.visible=false;
+
+let sx=0;
+let sy=0;
+let n=0;
+
+if(best){
+
+if(tracker.last&&age>0&&age<250){
+
+let vx=(best.x-tracker.x)/age;
+let vy=(best.y-tracker.y)/age;
+
+tracker.vx=tracker.vx*.35+vx*.65;
+tracker.vy=tracker.vy*.35+vy*.65;
+
+}else{
+
+tracker.vx=0;
+tracker.vy=0;
+
+}
+
+tracker.x=best.x;
+tracker.y=best.y;
+tracker.radius=best.radius;
+tracker.last=t;
+tracker.visible=true;
+
+n=10;
+sx=best.x*n;
+sy=best.y*n;
+
+}else if(tracker.last&&age<250){
+
+let px=tracker.x+tracker.vx*age;
+let py=tracker.y+tracker.vy*age;
+
+if(px>=0&&px<w&&py>=0&&py<h){
+
+ctx.strokeStyle='yellow';
+ctx.lineWidth=3;
+
+ctx.beginPath();
+
+ctx.arc(
+px,py,
+tracker.radius+5,
+0,Math.PI*2
+);
+
+ctx.stroke();
+
+ctx.fillStyle='yellow';
+ctx.font='12px Arial';
+
+ctx.fillText(
+'PREDICTING',
+px-30,py-20
+);
+
+}
+
+}
 
 hoop=[];
 
