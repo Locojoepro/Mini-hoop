@@ -547,7 +547,316 @@ ctx.lineWidth=3;
 ctx.beginPath();
 ctx.moveTo(threeLine[0].x,threeLine[0].y);
 ctx.lineTo(threeLine[1].x,threeLine[1].y);
+
+<script>
+const upgrade = document.createElement('div');
+
+upgrade.innerHTML = `
+<h3>SMART CAMERA</h3>
+<button id="smartMode">AUTO: ON</button>
+<button id="calibrateLine">SET 3-POINT LINE</button>
+<button id="possessionSwitch">SWITCH POSSESSION</button>
+<p>Home = Red shirts | Away = Blue shirts</p>
+<p id="smartStatus">Waiting for camera</p>
+<label>
+<input type="checkbox" id="autoThree" checked>
+Automatic three-pointers
+</label>
+<label>
+<input type="checkbox" id="autoPossession" checked>
+Automatic possession
+</label>
+`;
+
+document.querySelector('.controls').prepend(upgrade);
+
+let smartEnabled = true;
+let linePoints = [];
+let settingLine = false;
+let currentShot = null;
+let lastGreen = null;
+let playerHolder = null;
+let holderSeen = 0;
+let holderCandidate = null;
+let holderFrames = 0;
+let lockUntil = 0;
+
+$('smartMode').onclick = function(){
+smartEnabled = !smartEnabled;
+this.textContent = smartEnabled
+? 'AUTO: ON' : 'AUTO: OFF';
+currentShot = null;
+};
+
+$('possessionSwitch').onclick = function(){
+$('team').value = $('team').value === 'home'
+? 'away' : 'home';
+currentShot = null;
+playerHolder = null;
+holderCandidate = null;
+holderFrames = 0;
+lockUntil = performance.now()+1500;
+};
+
+$('calibrateLine').onclick = function(){
+linePoints = [];
+settingLine = true;
+$('cameraPanel').style.display = 'block';
+$('smartStatus').textContent =
+'Tap both ends of your 3-point line';
+};
+
+canvas.addEventListener('click', function(e){
+if(!settingLine)return;
+e.stopImmediatePropagation();
+
+let rect = canvas.getBoundingClientRect();
+
+linePoints.push({
+x:(e.clientX-rect.left)*canvas.width/rect.width,
+y:(e.clientY-rect.top)*canvas.height/rect.height
+});
+
+if(linePoints.length===2){
+settingLine=false;
+$('smartStatus').textContent =
+'3-point line ready';
+}
+},true);
+
+function boundarySide(x,y){
+let a=linePoints[0];
+let b=linePoints[1];
+
+return (b.x-a.x)*(y-a.y)
+-(b.y-a.y)*(x-a.x);
+}
+
+function smartPoints(x,y){
+if(Number($('points').value)===1)return 1;
+
+if(!$('autoThree').checked ||
+linePoints.length!==2 ||
+marks.length!==2){
+return Number($('points').value);
+}
+
+let rimSide=boundarySide(
+marks[1][0],marks[1][1]);
+
+return boundarySide(x,y)*rimSide<0 ? 3:2;
+}
+
+function findPlayer(data,x,y){
+let red=0,blue=0;
+let rx=0,ry=0,bx=0,by=0;
+
+for(let dy=-15;dy<85;dy+=3){
+for(let dx=-55;dx<55;dx+=3){
+
+let px=Math.round(x+dx);
+let py=Math.round(y+dy);
+
+if(px<0||py<0||
+px>=canvas.width||
+py>=canvas.height)continue;
+
+let i=(py*canvas.width+px)*4;
+let r=data[i],g=data[i+1],b=data[i+2];
+
+if(r>100&&r>g*1.6&&r>b*1.5){
+red++;
+rx+=px;
+ry+=py;
+}
+
+if(b>100&&b>r*1.6&&b>g*1.5){
+blue++;
+bx+=px;
+by+=py;
+}
+}
+}
+
+if(red>18&&red>blue*1.8){
+return {
+team:'home',
+x:rx/red,
+y:ry/red
+};
+}
+
+if(blue>18&&blue>red*1.8){
+return {
+team:'away',
+x:bx/blue,
+y:by/blue
+};
+}
+
+return null;
+}
+
+const baseScore = score;
+
+score = function(team,n){
+
+let cameraBasket = armed &&
+n>0 && n<=3;
+
+if(smartEnabled&&cameraBasket){
+
+if(currentShot){
+
+if($('autoPossession').checked){
+team=currentShot.team;
+}
+
+if($('autoThree').checked &&
+Number($('points').value)!==1){
+n=currentShot.points;
+}
+
+}
+
+baseScore(team,n);
+
+if($('autoPossession').checked){
+$('team').value=
+team==='home'?'away':'home';
+}
+
+$('smartStatus').textContent=
+team.toUpperCase()+' SCORED '+n;
+
+currentShot=null;
+playerHolder=null;
+holderCandidate=null;
+holderFrames=0;
+lockUntil=performance.now()+1500;
+
+}else{
+baseScore(team,n);
+}
+};
+
+function smartTracking(t){
+
+if(cameraRunning&&smartEnabled&&
+marks.length===2){
+
+let data=ctx.getImageData(
+0,0,canvas.width,canvas.height
+).data;
+
+let sx=0,sy=0,count=0;
+let tol=Number($('sensitivity').value);
+
+for(let y=0;y<canvas.height;y+=3){
+for(let x=0;x<canvas.width;x+=3){
+
+let i=(y*canvas.width+x)*4;
+let r=data[i],g=data[i+1],b=data[i+2];
+
+if(g>65&&g-r>tol&&g-b>tol){
+sx+=x;
+sy+=y;
+count++;
+}
+}
+}
+
+if(count>4&&count<700){
+
+let x=sx/count;
+let y=sy/count;
+
+if(!currentShot&&t>lockUntil){
+
+let player=findPlayer(data,x,y);
+
+if(player){
+
+if(holderCandidate===player.team){
+holderFrames++;
+}else{
+holderCandidate=player.team;
+holderFrames=1;
+}
+
+if(holderFrames>=3){
+playerHolder=player;
+holderSeen=t;
+
+if($('autoPossession').checked){
+$('team').value=player.team;
+}
+
+$('smartStatus').textContent=
+$('team').value.toUpperCase()+
+' POSSESSION';
+}
+
+}else{
+holderCandidate=null;
+holderFrames=0;
+}
+
+if(lastGreen&&playerHolder&&
+t-holderSeen<600&&
+lastGreen.y-y>7){
+
+currentShot={
+team:$('team').value,
+points:smartPoints(
+playerHolder.x,
+playerHolder.y
+),
+time:t
+};
+
+$('smartStatus').textContent=
+currentShot.team.toUpperCase()+
+' SHOOTS '+currentShot.points;
+}
+}
+
+lastGreen={x,y};
+
+}else{
+lastGreen=null;
+}
+
+if(currentShot&&
+t-currentShot.time>2500){
+currentShot=null;
+playerHolder=null;
+$('smartStatus').textContent=
+'Tracking possession';
+}
+
+if(linePoints.length===2){
+ctx.strokeStyle='yellow';
+ctx.lineWidth=3;
+ctx.beginPath();
+ctx.moveTo(
+linePoints[0].x,
+linePoints[0].y
+);
+ctx.lineTo(
+linePoints[1].x,
+linePoints[1].y
+);
 ctx.stroke();
+}
+}
+
+requestAnimationFrame(smartTracking);
+}
+
+requestAnimationFrame(smartTracking);
+</script>
+
 }
 
 requestAnimationFrame(automaticTracking);
